@@ -135,6 +135,7 @@ func newCompiler() *Compiler {
 		"guardbreakset":        c.guardBreakSet,
 		"guardpointsadd":       c.guardPointsAdd,
 		"guardpointsset":       c.guardPointsSet,
+		"hitscaleset":          c.hitScaleSet,
 		"loadfile":             c.loadFile,
 		"mapset":               c.mapSet,
 		"mapadd":               c.mapAdd,
@@ -7109,6 +7110,55 @@ func (c *Compiler) guardPointsSet(is IniSection, sc *StateControllerBase,
 			return err
 		}
 		return c.paramValue(is, sc, "value", guardPointsSet_value, VT_Int, 1, true)
+	})
+	return *ret, err
+}
+func (c *Compiler) hitScaleSet(is IniSection, sc *StateControllerBase,
+	_ int8) (StateController, error) {
+	ret, err := (*hitScaleSet)(sc), c.stateSec(is, func() error {
+		if err := c.paramValue(is, sc, "redirectid",
+			hitScaleSet_redirectid, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if _, ok := is["id"]; !ok {
+			c.scAdd(sc, hitScaleSet_id, "-1", VT_Int, 1)
+		} else if err := c.paramValue(is, sc, "id",
+			hitScaleSet_id, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "damagemul",
+			hitScaleSet_damagemul, VT_Float, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "damageadd",
+			hitScaleSet_damageadd, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "damagemin",
+			hitScaleSet_damagemin, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "damagemax",
+			hitScaleSet_damagemax, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "stunmul",
+			hitScaleSet_stunmul, VT_Float, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "stunadd",
+			hitScaleSet_stunadd, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "stunmin",
+			hitScaleSet_stunmin, VT_Int, 1, false); err != nil {
+			return err
+		}
+		if err := c.paramValue(is, sc, "stunmax",
+			hitScaleSet_stunmax, VT_Int, 1, false); err != nil {
+			return err
+		}
+		return nil
 	})
 	return *ret, err
 }

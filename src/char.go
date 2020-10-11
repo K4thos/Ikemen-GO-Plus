@@ -1599,6 +1599,7 @@ type Char struct {
 	remapSpr              RemapPreset
 	clipboardText         []string
 	immortal              bool
+	hitScale              map[int32][2]*HitScale
 }
 
 func newChar(n int, idx int32) (c *Char) {
@@ -1628,6 +1629,7 @@ func (c *Char) init(n int, idx int32) {
 	} else {
 		c.mapArray = make(map[string]float32)
 		c.remapSpr = make(RemapPreset)
+		c.hitScale = make(map[int32][2]*HitScale)
 	}
 	c.key = n
 	if n >= 0 && n < len(sys.com) && sys.com[n] != 0 {
@@ -3818,7 +3820,7 @@ func (c *Char) targetLifeAdd(tar []int32, add int32, kill, absolute bool) {
 	c.damageCount -= add
 	for _, tid := range tar {
 		if t := sys.playerID(tid); t != nil {
-			dmg := float64(t.computeDamage(-float64(add), kill, absolute, 1))
+			dmg := float64(t.computeDamage(-float64(add), kill, absolute, 1, c))
 			t.lifeAdd(-dmg, true, true)
 			t.redLifeAdd(dmg*float64(c.gi().constants["default.lifetoredlifemul"]), true)
 		}
@@ -3943,11 +3945,12 @@ func (c *Char) targetDrop(excludeid int32, keepone bool) {
 	}
 }
 func (c *Char) computeDamage(damage float64, kill, absolute bool,
-	atkmul float32) int32 {
+	atkmul float32, attacker *Char) int32 {
 	if damage == 0 || !absolute && atkmul == 0 {
 		return 0
 	}
 	if !absolute {
+		damage = float64(attacker.scaleHit(int32(damage), c.id, 0))
 		damage *= float64(atkmul) / c.finalDefence
 	}
 	damage = math.Ceil(damage)
@@ -4324,6 +4327,40 @@ func (c *Char) remapSpritePreset(preset string) {
 			c.remapSprite(src, dst)
 		}
 	}
+}
+
+type HitScale struct {
+	mul float32
+	add int32
+	min int32
+	max int32
+}
+
+func newHitScale() *HitScale {
+	return &HitScale{}
+}
+func (c *Char) scaleHit(value, id int32, index int) int32 {
+	ret := value
+	var hs *HitScale
+	matched := false
+	if v, ok := c.hitScale[id]; ok {
+		hs = v[index]
+		matched = true
+	} else if v, ok := c.hitScale[-1]; ok {
+		hs = v[index]
+		matched = true
+	}
+	if matched {
+		ret += hs.add
+		if hs.mul != 0 {
+			ret = int32(math.Ceil(float64(ret) * float64(hs.mul)))
+		}
+		ret = Max(hs.min, ret)
+		if hs.max != 0 {
+			ret = Min(hs.max, ret)
+		}
+	}
+	return ret
 }
 
 // MapSet() sets a map to a specific value.
@@ -5033,6 +5070,13 @@ func (c *Char) update(cvmin, cvmax,
 				c.makeDust(0, 0)
 			}
 		}
+		for k, _ := range c.hitScale {
+			if k != -1 {
+				if p := sys.playerID(k); p != nil /*&& p.player*/ && p.ss.moveType != MT_H {
+					delete(c.hitScale, k)
+				}
+			}
+		}
 	}
 	c.finalDefence = float64(((float32(c.gi().data.defence) * c.customDefence * c.defenceMul) / 100))
 	if sys.tickNextFrame() {
@@ -5531,7 +5575,7 @@ func (cl *CharList) clsn(getter *Char, proj bool) {
 				}
 				if guard && int32(getter.ss.stateType)&hd.guardflag != 0 {
 					ghv.hitshaketime = Max(0, hd.guard_shaketime)
-					ghv.hittime = Max(0, hd.guard_hittime)
+					ghv.hittime = Max(0, c.scaleHit(hd.guard_hittime, getter.id, 1))
 					ghv.slidetime = hd.guard_slidetime
 					ghv.guarded = true
 					if getter.ss.stateType == ST_A {
@@ -5549,13 +5593,13 @@ func (cl *CharList) clsn(getter *Char, proj bool) {
 					ghv.hitshaketime = Max(0, hd.shaketime)
 					ghv.slidetime = hd.ground_slidetime
 					if getter.ss.stateType == ST_A {
-						ghv.hittime = hd.air_hittime
+						ghv.hittime = c.scaleHit(hd.air_hittime, getter.id, 1)
 						ghv.ctrltime = hd.air_hittime
 						ghv.xvel = hd.air_velocity[0] * c.localscl / getter.localscl
 						ghv.yvel = hd.air_velocity[1] * c.localscl / getter.localscl
 						ghv.fallf = hd.air_fall
 					} else if getter.ss.stateType == ST_L {
-						ghv.hittime = hd.down_hittime
+						ghv.hittime = c.scaleHit(hd.down_hittime, getter.id, 1)
 						ghv.ctrltime = hd.down_hittime
 						ghv.xvel = hd.down_velocity[0] * c.localscl / getter.localscl
 						if getter.movedY {
@@ -5576,9 +5620,9 @@ func (cl *CharList) clsn(getter *Char, proj bool) {
 							ghv.yvel = -0.001 * c.localscl / getter.localscl //新MUGENだとウィンドウサイズを大きくするとここに入る数値が小さくなるが、再現しないほうがよいと思う。
 						}
 						if ghv.yvel != 0 {
-							ghv.hittime = hd.air_hittime
+							ghv.hittime = c.scaleHit(hd.air_hittime, getter.id, 1)
 						} else {
-							ghv.hittime = hd.ground_hittime
+							ghv.hittime = c.scaleHit(hd.ground_hittime, getter.id, 1)
 						}
 					}
 					if ghv.hittime < 0 {
@@ -5677,7 +5721,7 @@ func (cl *CharList) clsn(getter *Char, proj bool) {
 				kill = hd.guard_kill
 			}
 			getter.ghv.damage += getter.computeDamage(
-				float64(absdamage)*float64(hits), kill, false, attackMul)
+				float64(absdamage)*float64(hits), kill, false, attackMul, c)
 			if ghvset && getter.ghv.damage >= getter.life {
 				if kill || !live {
 					getter.ghv.fallf = true

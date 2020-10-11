@@ -6358,6 +6358,59 @@ func (sc guardPointsSet) Run(c *Char, _ []int32) bool {
 	return false
 }
 
+type hitScaleSet StateControllerBase
+
+const (
+	hitScaleSet_id byte = iota
+	hitScaleSet_damagemul
+	hitScaleSet_damageadd
+	hitScaleSet_damagemin
+	hitScaleSet_damagemax
+	hitScaleSet_stunmul
+	hitScaleSet_stunadd
+	hitScaleSet_stunmin
+	hitScaleSet_stunmax
+	hitScaleSet_redirectid
+)
+
+func (sc hitScaleSet) Run(c *Char, _ []int32) bool {
+	crun := c
+	var eid int32
+	StateControllerBase(sc).run(c, func(id byte, exp []BytecodeExp) bool {
+		switch id {
+		case hitScaleSet_id:
+			eid = exp[0].evalI(c)
+			if _, ok := crun.hitScale[eid]; !ok {
+				crun.hitScale[eid] = [2]*HitScale{newHitScale(), newHitScale()}
+			}
+		case hitScaleSet_damagemul:
+			crun.hitScale[eid][0].mul = exp[0].evalF(c)
+		case hitScaleSet_damageadd:
+			crun.hitScale[eid][0].add = exp[0].evalI(c)
+		case hitScaleSet_damagemin:
+			crun.hitScale[eid][0].min = exp[0].evalI(c)
+		case hitScaleSet_damagemax:
+			crun.hitScale[eid][0].max = exp[0].evalI(c)
+		case hitScaleSet_stunmul:
+			crun.hitScale[eid][1].mul = exp[0].evalF(c)
+		case hitScaleSet_stunadd:
+			crun.hitScale[eid][1].add = exp[0].evalI(c)
+		case hitScaleSet_stunmin:
+			crun.hitScale[eid][1].min = exp[0].evalI(c)
+		case hitScaleSet_stunmax:
+			crun.hitScale[eid][1].max = exp[0].evalI(c)
+		case hitScaleSet_redirectid:
+			if rid := sys.playerID(exp[0].evalI(c)); rid != nil {
+				crun = rid
+			} else {
+				return false
+			}
+		}
+		return true
+	})
+	return false
+}
+
 type loadFile StateControllerBase
 
 const (
