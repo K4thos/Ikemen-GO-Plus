@@ -577,7 +577,7 @@ type Stage struct {
 	bgct            bgcTimeLine
 	bga             bgAction
 	sdw             stageShadow
-	p               [2]stagePlayer
+	p               [MaxSimul*2]stagePlayer
 	leftbound       float32
 	rightbound      float32
 	screenleft      int32
@@ -689,13 +689,21 @@ func loadStage(def string, main bool) (*Stage, error) {
 		}
 	}
 	if sec := defmap["playerinfo"]; len(sec) > 0 {
+		sec[0].ReadF32("p1p3dist", &s.p1p3dist)
 		sec[0].ReadI32("p1startx", &s.p[0].startx)
 		sec[0].ReadI32("p1starty", &s.p[0].starty)
 		sec[0].ReadI32("p2startx", &s.p[1].startx)
 		sec[0].ReadI32("p2starty", &s.p[1].starty)
+		for k := range s.p {
+			if k >= 2 {
+				facing := 1 - 2*float32(k&1)
+				s.p[k].startx = int32(float32(s.p[k&1].startx) - facing*float32(k>>1)*s.p1p3dist)
+				sec[0].ReadI32(fmt.Sprintf("p%vstartx", k+1), &s.p[k].startx)
+				sec[0].ReadI32(fmt.Sprintf("p%vstarty", k+1), &s.p[k].starty)
+			}
+		}
 		sec[0].ReadF32("leftbound", &s.leftbound)
 		sec[0].ReadF32("rightbound", &s.rightbound)
-		sec[0].ReadF32("p1p3dist", &s.p1p3dist)
 	}
 	if sec := defmap["scaling"]; len(sec) > 0 {
 		if s.ver[0] == 0 { //mugen 1.0+ removed support for topscale

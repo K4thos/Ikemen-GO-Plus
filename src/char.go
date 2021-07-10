@@ -3461,8 +3461,7 @@ func (c *Char) posReset() {
 		c.setX(0)
 	} else {
 		c.facing = 1 - 2*float32(c.playerNo&1)
-		c.setX((float32(sys.stage.p[c.playerNo&1].startx-sys.cam.startx)*
-			sys.stage.localscl - c.facing*float32(c.playerNo>>1)*sys.stage.p1p3dist) / c.localscl)
+		c.setX((float32(sys.stage.p[c.playerNo].startx-sys.cam.startx)*sys.stage.localscl) / c.localscl)
 	}
 	c.setY(0)
 	c.setZ(0)
